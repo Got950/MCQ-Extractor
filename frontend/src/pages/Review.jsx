@@ -4,6 +4,8 @@ import { Link, useParams } from "react-router-dom";
 import { getJob, getQuestions, updateQuestion } from "../api/client.js";
 import QuestionCard from "../components/QuestionCard.jsx";
 
+const OPTION_KEYS = ["A", "B", "C", "D"];
+
 export default function Review() {
   const { id } = useParams();
   const [job, setJob] = useState(null);
@@ -96,15 +98,21 @@ export default function Review() {
         <ol className="space-y-6">
           {questions.map((q, idx) => (
             <li key={q.id}>
-              <QuestionCard
-                question={q}
-                index={idx + 1}
-                editing={editingId === q.id}
-                onEdit={() => setEditingId(q.id)}
-                onCancel={() => setEditingId(null)}
-                onSave={(payload) => saveQuestion(q.id, payload)}
-                savedAt={savedAtById[q.id]}
-              />
+              {editingId === q.id ? (
+                <QuestionEditor
+                  question={q}
+                  index={idx + 1}
+                  onCancel={() => setEditingId(null)}
+                  onSave={(payload) => saveQuestion(q.id, payload)}
+                />
+              ) : (
+                <QuestionCard
+                  question={q}
+                  index={idx + 1}
+                  onEdit={() => setEditingId(q.id)}
+                  savedAt={savedAtById[q.id]}
+                />
+              )}
             </li>
           ))}
         </ol>
@@ -113,3 +121,106 @@ export default function Review() {
   );
 }
 
+function QuestionEditor({ question, index, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    question_text: question.question_text || "",
+    option_a: question.option_a || "",
+    option_b: question.option_b || "",
+    option_c: question.option_c || "",
+    option_d: question.option_d || "",
+    correct_answer: question.correct_answer || "",
+    solution: question.solution || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave({
+        ...form,
+        correct_answer: form.correct_answer || null,
+      });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="card !p-6 ring-2 ring-zinc-200">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-700">
+        Editing question {index}
+      </h2>
+
+      <label className="mt-4 block">
+        <span className="label-field">Question text</span>
+        <textarea
+          value={form.question_text}
+          onChange={(e) => update("question_text", e.target.value)}
+          rows={3}
+          className="input-field mt-1"
+        />
+      </label>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {OPTION_KEYS.map((key) => (
+          <label key={key} className="block">
+            <span className="label-field">Option {key}</span>
+            <input
+              value={form[`option_${key.toLowerCase()}`]}
+              onChange={(e) => update(`option_${key.toLowerCase()}`, e.target.value)}
+              className="input-field mt-1"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="label-field">Correct answer</span>
+          <select
+            value={form.correct_answer || ""}
+            onChange={(e) => update("correct_answer", e.target.value)}
+            className="input-field mt-1"
+          >
+            <option value="">— none —</option>
+            {OPTION_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="mt-4 block">
+        <span className="label-field">Solution (use &lt;br&gt; to separate steps)</span>
+        <textarea
+          value={form.solution}
+          onChange={(e) => update("solution", e.target.value)}
+          rows={4}
+          className="input-field mt-1"
+        />
+      </label>
+
+      {err && <div className="alert-error mt-4">{err}</div>}
+
+      <div className="mt-6 flex gap-3">
+        <button type="submit" disabled={saving} className="btn-primary">
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button type="button" onClick={onCancel} className="btn-secondary">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}

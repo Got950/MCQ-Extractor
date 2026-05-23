@@ -1,14 +1,12 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field
 
 Subject = Literal["Physics", "Chemistry", "Mathematics"]
 Provider = Literal["gemini", "ollama"]
 JobStatus = Literal["pending", "queued", "processing", "done", "failed"]
 CorrectAnswer = Literal["A", "B", "C", "D"]
-QuestionSubject = Literal["Physics", "Chemistry", "Mathematics", "General"]
-VALID_QUESTION_SUBJECTS = frozenset({"Physics", "Chemistry", "Mathematics", "General"})
 
 
 # --- Auth -------------------------------------------------------------------
@@ -74,7 +72,6 @@ class QuestionOut(BaseModel):
     option_d: str
     correct_answer: Optional[CorrectAnswer] = None
     solution: str = ""
-    subject: str = "General"
 
     @classmethod
     def from_question(cls, q) -> "QuestionOut":
@@ -88,7 +85,6 @@ class QuestionOut(BaseModel):
             option_d=q.option_d,
             correct_answer=q.correct_answer,
             solution=q.solution,
-            subject=q.subject,
         )
 
 
@@ -100,16 +96,6 @@ class QuestionUpdate(BaseModel):
     option_d: Optional[str] = None
     correct_answer: Optional[CorrectAnswer] = None
     solution: Optional[str] = None
-    subject: Optional[str] = None
-
-    @field_validator("subject")
-    @classmethod
-    def subject_must_be_valid(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in VALID_QUESTION_SUBJECTS:
-            raise ValueError(
-                "subject must be Physics, Chemistry, Mathematics, or General"
-            )
-        return v
 
 
 # --- Health -----------------------------------------------------------------

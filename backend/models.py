@@ -44,4 +44,3 @@ class Question:
     option_d: str
     correct_answer: str | None
     solution: str
-    subject: str
