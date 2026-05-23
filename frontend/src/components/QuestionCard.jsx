@@ -4,9 +4,7 @@ const OPTION_KEYS = ["A", "B", "C", "D"];
 
 function typesetCard(cardEl) {
   if (cardEl && window.MathJax?.typesetPromise) {
-    window.MathJax.typesetPromise([cardEl]).catch(() => {
-      /* ignore typeset errors */
-    });
+    window.MathJax.typesetPromise([cardEl]).catch(() => {});
   }
 }
 
@@ -18,25 +16,16 @@ export default function QuestionCard({ question, index, onEdit, savedAt }) {
   }, [question, savedAt]);
 
   return (
-    <article
-      ref={cardRef}
-      className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow"
-    >
+    <article ref={cardRef} className="card !p-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-          Question {index}
-        </h2>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded-md border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 transition hover:border-sky-500 hover:text-sky-300"
-        >
+        <h2 className="label-field">Question {index}</h2>
+        <button type="button" onClick={onEdit} className="btn-secondary py-1 text-xs">
           Edit
         </button>
       </div>
 
       <div
-        className="prose prose-invert mt-4 max-w-none text-slate-100"
+        className="prose prose-sm mt-4 max-w-none text-gray-900"
         dangerouslySetInnerHTML={{ __html: question.question_text || "" }}
       />
 
@@ -48,19 +37,16 @@ export default function QuestionCard({ question, index, onEdit, savedAt }) {
             <li
               key={key}
               className={[
-                "flex gap-3 rounded-lg border px-4 py-2 text-sm",
+                "flex gap-3 rounded-lg border px-4 py-2.5 text-sm",
                 correct
-                  ? "border-emerald-600/60 bg-emerald-900/30 text-emerald-100"
-                  : "border-slate-800 bg-slate-900 text-slate-200",
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                  : "border-gray-200 bg-gray-50 text-gray-800",
               ].join(" ")}
             >
-              <span className="font-semibold">{key}.</span>
-              <div
-                className="flex-1"
-                dangerouslySetInnerHTML={{ __html: value || "" }}
-              />
+              <span className="font-bold text-gray-900">{key}.</span>
+              <div className="flex-1" dangerouslySetInnerHTML={{ __html: value || "" }} />
               {correct && (
-                <span className="text-xs uppercase tracking-wider text-emerald-300">
+                <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                   correct
                 </span>
               )}
@@ -70,12 +56,10 @@ export default function QuestionCard({ question, index, onEdit, savedAt }) {
       </ul>
 
       {question.solution && question.solution.trim().length > 0 && (
-        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/50 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Solution
-          </div>
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="label-field">Solution</div>
           <div
-            className="mt-2 text-sm text-slate-200"
+            className="prose prose-sm mt-2 max-w-none text-gray-800"
             dangerouslySetInnerHTML={{ __html: question.solution }}
           />
         </div>

@@ -42,9 +42,7 @@ class Settings:
     # --- Superadmin (seeded via scripts.init_database) ------------------------
     superadmin_email: str | None
     superadmin_password: str | None
-    superadmin_max_uploads: int
-
-    # --- Auth ---------------------------------------------------------------
+      # --- Auth ---------------------------------------------------------------
     jwt_algorithm: str
     jwt_expire_minutes: int
 
@@ -68,7 +66,6 @@ class Settings:
 
     # --- Limits -------------------------------------------------------------
     max_upload_mb: int
-    max_uploads_per_user: int
 
     @property
     def use_redis(self) -> bool:
@@ -102,9 +99,21 @@ def _resolve_gemini_primary_key() -> str | None:
     return None
 
 
+def _parse_allowed_origins() -> list[str]:
+    """Comma-separated origins; strips whitespace and trailing slashes."""
+    raw = os.environ.get("ALLOWED_ORIGIN") or os.environ.get("ALLOWED_ORIGINS") or ""
+    if not raw.strip():
+        raw = "http://localhost:5173"
+    origins: list[str] = []
+    for o in raw.split(","):
+        o = o.strip().rstrip("/")
+        if o:
+            origins.append(o)
+    return origins
+
+
 def load_settings() -> Settings:
-    allowed_origin = os.environ.get("ALLOWED_ORIGIN", "http://localhost:5173")
-    origins = [o.strip() for o in allowed_origin.split(",") if o.strip()]
+    origins = _parse_allowed_origins()
 
     upload_dir = Path(
         os.environ.get("UPLOAD_DIR", PROJECT_ROOT / "uploads")
@@ -118,7 +127,6 @@ def load_settings() -> Settings:
         mongodb_db_name=os.environ.get("MONGODB_DB_NAME", "mcq_extractor"),
         superadmin_email=(os.environ.get("SUPERADMIN_EMAIL") or "").strip() or None,
         superadmin_password=(os.environ.get("SUPERADMIN_PASSWORD") or "").strip() or None,
-        superadmin_max_uploads=_int(os.environ.get("SUPERADMIN_MAX_UPLOADS"), 100),
         jwt_algorithm=os.environ.get("JWT_ALGORITHM", "HS256"),
         jwt_expire_minutes=_int(os.environ.get("JWT_EXPIRE_MINUTES"), 60 * 24),
         redis_url=os.environ.get("REDIS_URL") or None,
@@ -132,7 +140,6 @@ def load_settings() -> Settings:
         ollama_host=os.environ.get("OLLAMA_HOST") or None,
         ollama_model=os.environ.get("OLLAMA_MODEL", "qwen2.5vl"),
         max_upload_mb=_int(os.environ.get("MAX_UPLOAD_MB"), 50),
-        max_uploads_per_user=_int(os.environ.get("MAX_UPLOADS_PER_USER"), 1),
     )
 
 

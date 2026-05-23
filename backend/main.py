@@ -82,26 +82,27 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[])
 app = FastAPI(title="MCQ Extractor", version=APP_VERSION)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.allowed_origins or ["*"],
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    allow_credentials=False,
-)
+_cors_kwargs: dict = {
+    "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["*"],
+    "allow_credentials": False,
+}
+if settings.environment == "production":
+    # Explicit ALLOWED_ORIGIN plus any Netlify site / branch preview URL.
+    _cors_kwargs["allow_origins"] = settings.allowed_origins
+    _cors_kwargs["allow_origin_regex"] = r"https://([a-z0-9-]+\.)*netlify\.app"
+else:
+    _cors_kwargs["allow_origins"] = settings.allowed_origins or ["*"]
+
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 ensure_database()
 logger.info(
-    "Backend up. DB=mongodb, storage=%s, queue=%s",
+    "Backend up. DB=mongodb, storage=%s, queue=%s, cors_origins=%s",
     "s3" if settings.use_s3 else "local",
     "redis" if settings.use_redis else "inproc",
+    settings.allowed_origins,
 )
-
-
-def _max_uploads_for(user: User) -> int:
-    if user.is_superadmin:
-        return settings.superadmin_max_uploads
-    return settings.max_uploads_per_user
 
 
 @app.exception_handler(RateLimitExceeded)
@@ -166,15 +167,12 @@ def login(request: Request, payload: LoginIn, db: Database = Depends(get_db)) ->
 
 def _user_out(db: Database, user: User) -> UserOut:
     count = count_jobs_for_user(db, user.id)
-    max_uploads = _max_uploads_for(user)
     return UserOut(
         id=user.id,
         email=user.email,
         created_at=user.created_at,
         is_superadmin=user.is_superadmin,
         upload_count=count,
-        max_uploads=max_uploads,
-        can_upload=count < max_uploads,
     )
 
 
@@ -227,15 +225,6 @@ async def upload_pdf(
     language = validate_language(language)
     provider = validate_provider(provider, settings.providers())
     assert_pdf_mime(file)
-
-    if count_jobs_for_user(db, user.id) >= _max_uploads_for(user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"Each account is limited to {_max_uploads_for(user)} upload(s). "
-                "View your extraction below or sign in with another account to upload again."
-            ),
-        )
 
     job_id = uuid.uuid4().hex
     pdf_key = f"{job_id}.pdf"

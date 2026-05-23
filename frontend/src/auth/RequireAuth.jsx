@@ -7,7 +7,7 @@ export default function RequireAuth({ children }) {
   const location = useLocation();
 
   if (loading) {
-    return <p className="text-sm text-slate-400">Loading…</p>;
+    return <p className="text-sm text-gray-500">Loading…</p>;
   }
   if (!user) {
     return (

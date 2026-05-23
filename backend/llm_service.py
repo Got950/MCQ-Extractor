@@ -30,7 +30,8 @@ DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GEMINI_CHUNK_PAGES = 1
 DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 65536
 DEFAULT_GEMINI_TIMEOUT_S = 75
-DEFAULT_GEMINI_JOB_BUDGET_S = 85
+# 0 = no job-level time limit (extraction runs until Gemini finishes or fails).
+DEFAULT_GEMINI_JOB_BUDGET_S = 0
 DEFAULT_GEMINI_MAX_PAGES_SINGLE_SHOT = 30
 DEFAULT_GEMINI_PARALLEL_WORKERS = 6
 _DEFAULT_MAX_RETRIES = 2
@@ -141,10 +142,18 @@ def _gemini_chunk_pages() -> int:
 
 
 def _gemini_job_budget_s() -> int:
+    """Seconds allowed for one extraction job. ``0`` disables the job deadline."""
     try:
-        return max(30, int(os.environ.get("GEMINI_JOB_BUDGET_S", str(DEFAULT_GEMINI_JOB_BUDGET_S))))
+        return max(0, int(os.environ.get("GEMINI_JOB_BUDGET_S", str(DEFAULT_GEMINI_JOB_BUDGET_S))))
     except ValueError:
         return DEFAULT_GEMINI_JOB_BUDGET_S
+
+
+def _job_deadline() -> float | None:
+    budget = _gemini_job_budget_s()
+    if budget <= 0:
+        return None
+    return time.monotonic() + budget
 
 
 def _gemini_max_pages_single_shot() -> int:
@@ -161,11 +170,14 @@ def _gemini_parallel_workers() -> int:
         return DEFAULT_GEMINI_PARALLEL_WORKERS
 
 
-def _check_job_deadline(deadline: float) -> None:
+def _check_job_deadline(deadline: float | None) -> None:
+    if deadline is None:
+        return
     if time.monotonic() > deadline:
+        budget = _gemini_job_budget_s()
         raise RuntimeError(
-            "Extraction exceeded the 90 second time limit. "
-            "Try a shorter PDF or fewer pages per file."
+            f"Extraction exceeded the {budget} second time limit (GEMINI_JOB_BUDGET_S). "
+            "Set GEMINI_JOB_BUDGET_S=0 on the server to disable this cap."
         )
 
 
@@ -557,7 +569,7 @@ def _gemini_extract_full_document(
     subject: str,
     model_name: str,
 ) -> list[dict[str, Any]]:
-    """One API call for the entire PDF (fastest path, target 20–90s)."""
+    """One API call for the entire PDF (fastest path for small PDFs)."""
     base_prompt = SHARED_PROMPT_TEMPLATE.format(subject=subject)
     pdf_b64 = base64.b64encode(doc.tobytes()).decode("ascii")
     prompt = (
@@ -624,9 +636,9 @@ def _gemini_parallel_page_extract(
     subject: str,
     model_name: str,
     job_id: str | None,
-    deadline: float,
+    deadline: float | None,
 ) -> list[dict[str, Any]]:
-    """Fallback: one page per worker in parallel (still within ~90s budget)."""
+    """Fallback: one page per worker in parallel."""
     from job_progress import set_progress
 
     workers = min(_gemini_parallel_workers(), total_pages)
@@ -706,7 +718,7 @@ def _call_gemini(
     from job_progress import set_progress
 
     model_name = _gemini_model_name()
-    deadline = time.monotonic() + _gemini_job_budget_s()
+    deadline = _job_deadline()
 
     with fitz.open(pdf_path) as doc:
         total_pages = len(doc)
@@ -717,7 +729,7 @@ def _call_gemini(
 
         master: list[dict[str, Any]] = []
 
-        # Fast path: entire PDF in one Gemini call (typical 20–90s).
+        # Fast path: entire PDF in one Gemini call when the PDF is small enough.
         if total_pages <= _gemini_max_pages_single_shot():
             if job_id:
                 set_progress(job_id, current=1, total=1, label="Full document")

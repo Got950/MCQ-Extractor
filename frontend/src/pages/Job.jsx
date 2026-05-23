@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import ExtractionStatusBar from "../components/ExtractionStatusBar.jsx";
 import { getJob, retryJob } from "../api/client.js";
 
-const POLL_MS = 5000;
+const POLL_ACTIVE_MS = 2000;
+const POLL_IDLE_MS = 5000;
 
 export default function Job() {
   const { id } = useParams();
@@ -23,7 +25,9 @@ export default function Job() {
         setJob(data);
         setError(null);
         if (data.status !== "done" && data.status !== "failed") {
-          timer = setTimeout(tick, POLL_MS);
+          const delay =
+            data.status === "processing" || data.status === "queued" ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+          timer = setTimeout(tick, delay);
         }
       } catch (err) {
         if (cancelled) return;
@@ -37,7 +41,7 @@ export default function Job() {
         }
         setError(err.message);
         if (err.status === 401) return;
-        timer = setTimeout(tick, POLL_MS);
+        timer = setTimeout(tick, POLL_IDLE_MS);
       }
     }
 
@@ -48,57 +52,57 @@ export default function Job() {
     };
   }, [id, pollKey]);
 
+  const inProgress = job && job.status !== "done" && job.status !== "failed";
+
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl">
-      <h1 className="text-2xl font-semibold text-slate-100">Extraction job</h1>
-      <p className="mt-1 text-xs text-slate-500">Job ID · {id}</p>
+    <div className="card">
+      <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Extraction job</h1>
+      <p className="mt-1 text-xs text-gray-400">Job ID · {id}</p>
 
       {error && !job && (
         <div className="mt-6 space-y-4">
-          <div className="rounded-lg border border-amber-700/60 bg-amber-900/30 px-4 py-3 text-sm text-amber-100">
-            {error}
-          </div>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-medium text-white shadow transition hover:bg-sky-400"
-          >
-            Go to your uploads
+          <div className="alert-warning">{error}</div>
+          <Link to="/" className="btn-primary">
+            Go to workspace
           </Link>
         </div>
       )}
 
-      {error && job && (
-        <div className="mt-6 rounded-lg border border-rose-700/60 bg-rose-900/30 px-4 py-3 text-sm text-rose-200">
-          {error}
-        </div>
-      )}
+      {error && job && <div className="alert-error mt-6">{error}</div>}
 
       {!job && !error ? (
-        <p className="mt-8 text-sm text-slate-400">Loading job status…</p>
+        <div className="mt-8">
+          <ExtractionStatusBar status="queued" />
+          <p className="mt-4 text-sm text-gray-500">Loading job status…</p>
+        </div>
       ) : !job ? null : (
         <>
+          <div className="mt-8">
+            <ExtractionStatusBar
+              status={job.status}
+              progressCurrent={job.progress_current ?? 0}
+              progressTotal={job.progress_total ?? 0}
+              progressLabel={job.progress_label}
+              questionCount={job.status === "done" ? job.question_count : undefined}
+            />
+          </div>
+
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <Meta label="Subject" value={job.subject} />
             <Meta label="Language" value={job.language} />
             <Meta label="Provider" value={job.provider} />
           </div>
 
-          <div className="mt-8">
-            <StatusBadge status={job.status} />
-            <p className="mt-3 text-sm text-slate-400">
-              {job.status === "processing" && job.progress_total
-                ? `Processing section ${job.progress_current} of ${job.progress_total}${
-                    job.progress_label ? ` (${job.progress_label})` : ""
-                  }…`
-                : describeStatus(job.status)}
+          {inProgress && (
+            <p className="mt-4 text-sm text-gray-500">
+              Please keep this page open while extraction runs. You will be able to review
+              questions when processing completes.
             </p>
-          </div>
+          )}
 
           {job.status === "failed" && job.error_message && (
             <div className="mt-6 space-y-4">
-              <div className="rounded-lg border border-rose-700/60 bg-rose-900/30 px-4 py-3 text-sm text-rose-200">
-                {job.error_message}
-              </div>
+              <div className="alert-error">{job.error_message}</div>
               <button
                 type="button"
                 disabled={retrying}
@@ -115,23 +119,23 @@ export default function Job() {
                     setRetrying(false);
                   }
                 }}
-                className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-medium text-white shadow transition hover:bg-sky-400 disabled:opacity-50"
+                className="btn-primary"
               >
                 {retrying ? "Retrying…" : "Retry extraction"}
               </button>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-gray-500">
                 Uses your current API key. Upload a new PDF from home if you changed files.
               </p>
             </div>
           )}
 
           {job.status === "done" && (
-            <div className="mt-8">
-              <Link
-                to={`/review/${job.id}`}
-                className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white shadow transition hover:bg-emerald-400"
-              >
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link to={`/review/${job.id}`} className="btn-success">
                 View {job.question_count} extracted questions
+              </Link>
+              <Link to="/" className="btn-secondary">
+                Upload another PDF
               </Link>
             </div>
           )}
@@ -143,43 +147,9 @@ export default function Job() {
 
 function Meta({ label, value }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
-      <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-1 text-sm text-slate-100">{value}</p>
+    <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+      <p className="label-field">{label}</p>
+      <p className="mt-1 text-sm font-medium text-gray-900">{value}</p>
     </div>
   );
-}
-
-function StatusBadge({ status }) {
-  const styles = {
-    pending: "border-slate-600 bg-slate-800 text-slate-200",
-    queued: "border-slate-600 bg-slate-800 text-slate-200",
-    processing: "border-sky-600/60 bg-sky-900/40 text-sky-200",
-    done: "border-emerald-600/60 bg-emerald-900/40 text-emerald-200",
-    failed: "border-rose-600/60 bg-rose-900/40 text-rose-200",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider ${styles[status] || styles.pending}`}
-    >
-      <span className="inline-block h-2 w-2 rounded-full bg-current" />
-      {status}
-    </span>
-  );
-}
-
-function describeStatus(status) {
-  switch (status) {
-    case "pending":
-    case "queued":
-      return "Job queued. Waiting to start.";
-    case "processing":
-      return "LLM is parsing the PDF. This usually takes 20–90 seconds.";
-    case "done":
-      return "Extraction complete. You can review and edit the questions.";
-    case "failed":
-      return "Extraction failed. See the error message below.";
-    default:
-      return "";
-  }
 }

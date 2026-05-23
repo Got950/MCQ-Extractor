@@ -11,39 +11,39 @@ export default function App() {
   const { user, signOut } = useAuth();
 
   return (
-    <div className="min-h-full">
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
+    <div className="flex min-h-full flex-col">
+      <header className="border-b border-gray-200 bg-white shadow-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link to="/" className="text-lg font-semibold text-slate-100" title="Upload PDF">
-            MCQ Extractor
+          <Link to="/" className="flex items-center gap-2" title="Upload PDF">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white">
+              M
+            </span>
+            <span className="text-lg font-semibold tracking-tight text-gray-900">
+              MCQ Extractor
+            </span>
           </Link>
           <div className="flex items-center gap-4 text-xs">
-            <span className="hidden uppercase tracking-wider text-slate-400 sm:inline">
-              FastAPI · Gemini · Ollama
+            <span className="hidden text-gray-400 sm:inline">
+              AI-powered question extraction
             </span>
             {user ? (
               <div className="flex items-center gap-3">
-                <span className="text-slate-300">{user.email}</span>
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="rounded-md border border-slate-700 px-3 py-1 text-slate-200 transition hover:border-sky-500 hover:text-sky-300"
-                >
+                <span className="max-w-[180px] truncate text-gray-600 sm:max-w-none">
+                  {user.email}
+                </span>
+                <button type="button" onClick={signOut} className="btn-secondary py-1.5">
                   Sign out
                 </button>
               </div>
             ) : (
-              <Link
-                to="/login"
-                className="rounded-md bg-sky-500 px-3 py-1 font-medium text-white transition hover:bg-sky-400"
-              >
+              <Link to="/login" className="btn-primary py-2">
                 Sign in
               </Link>
             )}
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -73,8 +73,10 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <footer className="mx-auto max-w-5xl px-6 py-6 text-xs text-slate-500">
-        Math rendered via MathJax. Inline math wrapped in \( ... \).
+      <footer className="border-t border-gray-200 bg-white py-6 text-center text-xs text-gray-400">
+        <div className="mx-auto max-w-5xl px-6">
+          Math rendered via MathJax · Inline math wrapped in \( ... \)
+        </div>
       </footer>
     </div>
   );
@@ -82,11 +84,11 @@ export default function App() {
 
 function NotFound() {
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900 p-6">
-      <h1 className="text-xl font-semibold">Page not found</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        <Link to="/" className="text-sky-400 hover:underline">
-          Back to upload
+    <div className="card">
+      <h1 className="text-xl font-semibold text-gray-900">Page not found</h1>
+      <p className="mt-2 text-sm text-gray-600">
+        <Link to="/" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+          Back to workspace
         </Link>
       </p>
     </div>

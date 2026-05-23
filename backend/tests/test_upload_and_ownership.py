@@ -65,25 +65,21 @@ def test_upload_ok_and_extracts(client, auth_headers, sample_pdf_bytes):
     assert qs[0]["correct_answer"] == "B"
 
 
-def test_second_upload_rejected_per_account_limit(
+def test_multiple_uploads_allowed_by_default(
     client, auth_headers, sample_pdf_bytes
 ):
     assert _upload(client, auth_headers, sample_pdf_bytes).status_code == 200
-    r2 = _upload(client, auth_headers, sample_pdf_bytes)
-    assert r2.status_code == 403
-    assert "limited to" in r2.json()["detail"].lower()
+    assert _upload(client, auth_headers, sample_pdf_bytes).status_code == 200
 
 
-def test_me_reports_upload_quota(client, auth_headers, sample_pdf_bytes):
+def test_me_reports_upload_count(client, auth_headers, sample_pdf_bytes):
     r = client.get("/api/auth/me", headers=auth_headers)
     assert r.status_code == 200
-    assert r.json()["can_upload"] is True
     assert r.json()["upload_count"] == 0
 
     _upload(client, auth_headers, sample_pdf_bytes)
     r2 = client.get("/api/auth/me", headers=auth_headers)
     assert r2.json()["upload_count"] == 1
-    assert r2.json()["can_upload"] is False
 
 
 def test_other_user_cannot_see_job(client, auth_headers, sample_pdf_bytes):

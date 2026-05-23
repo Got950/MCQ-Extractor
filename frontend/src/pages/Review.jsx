@@ -51,20 +51,15 @@ export default function Review() {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-slate-400">Loading questions…</p>;
+    return <p className="text-sm text-gray-500">Loading questions…</p>;
   }
 
   if (error) {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-amber-700/60 bg-amber-900/30 px-4 py-3 text-sm text-amber-100">
-          {error}
-        </div>
-        <Link
-          to="/"
-          className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-medium text-white shadow transition hover:bg-sky-400"
-        >
-          Go to your workspace
+        <div className="alert-warning">{error}</div>
+        <Link to="/" className="btn-primary">
+          Go to workspace
         </Link>
       </div>
     );
@@ -74,27 +69,31 @@ export default function Review() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Extracted questions</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+            Extracted questions
+          </h1>
           {job && (
-            <p className="mt-1 text-sm text-slate-400">
-              <span className="mr-2 inline-flex items-center rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs uppercase tracking-wider text-slate-300">
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-gray-700">
                 {job.subject}
               </span>
-              <span className="mr-2 text-xs text-slate-500">provider · {job.provider}</span>
-              <span className="text-xs text-slate-500">{questions.length} questions</span>
+              <span className="text-xs text-gray-500">· {job.provider}</span>
+              <span className="text-xs font-medium text-gray-700">
+                {questions.length} questions
+              </span>
             </p>
           )}
         </div>
         <Link
           to={`/job/${id}`}
-          className="text-xs text-sky-400 hover:underline"
+          className="text-sm font-medium text-zinc-900 underline-offset-2 hover:underline"
         >
           ← Back to job
         </Link>
       </header>
 
       {questions.length === 0 ? (
-        <p className="text-sm text-slate-400">No questions were extracted from this PDF.</p>
+        <p className="text-sm text-gray-500">No questions were extracted from this PDF.</p>
       ) : (
         <ol className="space-y-6">
           {questions.map((q, idx) => (
@@ -156,36 +155,29 @@ function QuestionEditor({ question, index, onSave, onCancel }) {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="rounded-2xl border border-sky-700/60 bg-slate-900/80 p-6 shadow"
-    >
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-sky-300">
+    <form onSubmit={submit} className="card !p-6 ring-2 ring-zinc-200">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-700">
         Editing question {index}
       </h2>
 
       <label className="mt-4 block">
-        <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-          Question text
-        </span>
+        <span className="label-field">Question text</span>
         <textarea
           value={form.question_text}
           onChange={(e) => update("question_text", e.target.value)}
           rows={3}
-          className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+          className="input-field mt-1"
         />
       </label>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {OPTION_KEYS.map((key) => (
           <label key={key} className="block">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-              Option {key}
-            </span>
+            <span className="label-field">Option {key}</span>
             <input
               value={form[`option_${key.toLowerCase()}`]}
               onChange={(e) => update(`option_${key.toLowerCase()}`, e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+              className="input-field mt-1"
             />
           </label>
         ))}
@@ -193,13 +185,11 @@ function QuestionEditor({ question, index, onSave, onCancel }) {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Correct answer
-          </span>
+          <span className="label-field">Correct answer</span>
           <select
             value={form.correct_answer || ""}
             onChange={(e) => update("correct_answer", e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+            className="input-field mt-1"
           >
             <option value="">— none —</option>
             {OPTION_KEYS.map((k) => (
@@ -212,36 +202,22 @@ function QuestionEditor({ question, index, onSave, onCancel }) {
       </div>
 
       <label className="mt-4 block">
-        <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-          Solution (use &lt;br&gt; to separate steps)
-        </span>
+        <span className="label-field">Solution (use &lt;br&gt; to separate steps)</span>
         <textarea
           value={form.solution}
           onChange={(e) => update("solution", e.target.value)}
           rows={4}
-          className="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+          className="input-field mt-1"
         />
       </label>
 
-      {err && (
-        <div className="mt-4 rounded-lg border border-rose-700/60 bg-rose-900/30 px-4 py-2 text-sm text-rose-200">
-          {err}
-        </div>
-      )}
+      {err && <div className="alert-error mt-4">{err}</div>}
 
       <div className="mt-6 flex gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-        >
+        <button type="submit" disabled={saving} className="btn-primary">
           {saving ? "Saving…" : "Save"}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500"
-        >
+        <button type="button" onClick={onCancel} className="btn-secondary">
           Cancel
         </button>
       </div>

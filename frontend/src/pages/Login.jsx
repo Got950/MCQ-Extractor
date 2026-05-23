@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { login, register } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -14,8 +14,6 @@ export default function Login() {
 
   const { signIn } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  // Always land on home — job/review URLs are per-account and break if bookmarked from another user.
   const redirectTo = "/";
 
   async function onSubmit(event) {
@@ -38,31 +36,31 @@ export default function Login() {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-xl">
-        <h1 className="text-2xl font-semibold text-slate-100">
+      <div className="card">
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
           {isLogin ? "Sign in" : "Create account"}
         </h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-gray-600">
           {isLogin
-            ? "Use your email and password to access your jobs."
-            : "Register to start extracting MCQs from PDFs."}
+            ? "Access your private workspace and extraction history."
+            : "Register to start extracting MCQs from academic PDFs."}
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <label className="block text-sm">
-            <span className="text-slate-300">Email</span>
+            <span className="font-medium text-gray-700">Email</span>
             <input
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-2 text-slate-100 focus:border-sky-500 focus:outline-none"
+              className="input-field mt-1"
             />
           </label>
 
           <label className="block text-sm">
-            <span className="text-slate-300">Password</span>
+            <span className="font-medium text-gray-700">Password</span>
             <input
               type="password"
               required
@@ -70,64 +68,43 @@ export default function Login() {
               autoComplete={isLogin ? "current-password" : "new-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-2 text-slate-100 focus:border-sky-500 focus:outline-none"
+              className="input-field mt-1"
             />
             {!isLogin && (
-              <span className="mt-1 block text-xs text-slate-500">
-                At least 8 characters.
-              </span>
+              <span className="mt-1 block text-xs text-gray-500">At least 8 characters.</span>
             )}
           </label>
 
-          <label className="flex items-center gap-2 text-xs text-slate-400">
+          <label className="flex items-center gap-2 text-xs text-gray-600">
             <input
               type="checkbox"
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
-              className="h-4 w-4"
+              className="h-4 w-4 rounded border-gray-300"
             />
             Remember me on this device
           </label>
 
-          {error && (
-            <div className="rounded-md border border-rose-700/60 bg-rose-900/30 px-3 py-2 text-sm text-rose-200">
-              {error}
-            </div>
-          )}
+          {error && <div className="alert-error">{error}</div>}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-          >
+          <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? "Please wait…" : isLogin ? "Sign in" : "Create account"}
           </button>
         </form>
 
-        <div className="mt-4 text-center text-sm text-slate-400">
+        <div className="mt-4 text-center text-sm text-gray-600">
           {isLogin ? "New here?" : "Already have an account?"}{" "}
           <button
             type="button"
             onClick={() => {
               setError(null);
-              if (isLogin) {
-                setMode("register");
-                navigate("/login", { replace: true, state: {} });
-              } else {
-                setMode("login");
-              }
+              setMode(isLogin ? "register" : "login");
             }}
-            className="text-sky-400 hover:underline"
+            className="font-semibold text-zinc-900 underline-offset-2 hover:underline"
           >
             {isLogin ? "Create one" : "Sign in"}
           </button>
         </div>
-
-        <p className="mt-6 text-xs text-slate-500">
-          <Link to="/" className="hover:underline">
-            ← Back home
-          </Link>
-        </p>
       </div>
     </div>
   );

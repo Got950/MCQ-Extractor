@@ -107,8 +107,7 @@ See `backend/.env.example` and `frontend/.env.example` for the full list.
 
 On deploy, Render’s build command runs `init_database`, which creates the
 superadmin user if `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` are set and the
-email does not exist yet. Superadmins get a higher upload limit
-(`SUPERADMIN_MAX_UPLOADS`, default 100).
+email does not exist yet. Users may run unlimited extractions.
 
 Regular users can still register via `/api/auth/register` unless you restrict
 that in your product policy.

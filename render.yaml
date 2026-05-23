@@ -24,8 +24,6 @@ services:
         sync: false
       - key: SUPERADMIN_PASSWORD
         sync: false
-      - key: SUPERADMIN_MAX_UPLOADS
-        value: "100"
       - key: REDIS_URL
         sync: false
       - key: GEMINI_API_KEY

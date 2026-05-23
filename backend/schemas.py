@@ -31,8 +31,6 @@ class UserOut(BaseModel):
     created_at: datetime
     is_superadmin: bool = False
     upload_count: int = 0
-    max_uploads: int = 1
-    can_upload: bool = True
 
 
 # --- LLM providers ----------------------------------------------------------

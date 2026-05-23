@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import ExtractionStatusBar from "../components/ExtractionStatusBar.jsx";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { getProviders, listJobs, uploadPdf } from "../api/client.js";
 
@@ -22,8 +23,6 @@ export default function Upload() {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [recentJobs, setRecentJobs] = useState([]);
-
-  const canUpload = user?.can_upload !== false;
 
   useEffect(() => {
     listJobs()
@@ -48,10 +47,10 @@ export default function Upload() {
     if (cardRef.current && window.anime) {
       window.anime({
         targets: cardRef.current,
-        translateY: [12, 0],
+        translateY: [8, 0],
         opacity: [0, 1],
         easing: "easeOutQuad",
-        duration: 450,
+        duration: 400,
       });
     }
   }, []);
@@ -90,10 +89,9 @@ export default function Upload() {
     try {
       const result = await uploadPdf({ file, subject, language: "English", provider });
       await refresh();
-      navigate(`/job/${result.id}`);
+      navigate(`/job/${result.id}`, { state: { fileName: file.name } });
     } catch (err) {
       setError(err.message || "Upload failed.");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -101,31 +99,31 @@ export default function Upload() {
   const noProviders = providersLoaded && !providers.gemini && !providers.ollama;
 
   return (
-    <div ref={cardRef} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl">
-      <h1 className="text-2xl font-semibold text-slate-100">Upload a PDF</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        We will extract every MCQ, render math properly, and let you review and edit.
-        Each account gets one upload. Only you can see your extracted questions.
+    <div ref={cardRef} className="card">
+      <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Upload a PDF</h1>
+      <p className="mt-2 text-sm text-gray-600">
+        Extract multiple-choice questions with AI, review math rendering, and export-ready
+        edits. Upload as many PDFs as you need — your workspace stays private.
       </p>
 
-      {!canUpload && (
-        <div className="mt-6 rounded-lg border border-sky-700/60 bg-sky-900/30 px-4 py-3 text-sm text-sky-100">
-          You have used your one upload for this account. Open your job below to review
-          questions, or sign in with another account to upload again.
+      {submitting && (
+        <div className="mt-8">
+          <ExtractionStatusBar status="uploading" fileName={file?.name} />
         </div>
       )}
 
       {noProviders && (
-        <div className="mt-6 rounded-lg border border-amber-700/60 bg-amber-900/30 px-4 py-3 text-sm text-amber-200">
-          No LLM providers are configured on the server. Set <code>GEMINI_API_KEY</code> or
-          <code> OLLAMA_HOST</code> in the backend <code>.env</code> and restart.
+        <div className="alert-warning mt-6">
+          No LLM providers are configured on the server. Set <code className="font-mono">GEMINI_API_KEY</code>{" "}
+          or <code className="font-mono">OLLAMA_HOST</code> in the backend environment.
         </div>
       )}
 
-      <form className="mt-8 space-y-6" onSubmit={onSubmit}>
+      <form className={`space-y-6 ${submitting ? "mt-6" : "mt-8"}`} onSubmit={onSubmit}>
         <DropZone
           file={file}
           dragOver={dragOver}
+          disabled={submitting}
           inputRef={fileInputRef}
           onDragOver={(e) => {
             e.preventDefault();
@@ -137,7 +135,7 @@ export default function Upload() {
             setDragOver(false);
             handleFile(e.dataTransfer.files?.[0]);
           }}
-          onPick={() => fileInputRef.current?.click()}
+          onPick={() => !submitting && fileInputRef.current?.click()}
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
 
@@ -146,7 +144,8 @@ export default function Upload() {
             <select
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+              disabled={submitting}
+              className="input-field"
             >
               {SUBJECTS.map((s) => (
                 <option key={s} value={s}>
@@ -160,7 +159,7 @@ export default function Upload() {
             <input
               value="English"
               disabled
-              className="block w-full cursor-not-allowed rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm text-slate-400"
+              className="input-field cursor-not-allowed bg-gray-50 text-gray-500"
             />
           </Field>
 
@@ -168,7 +167,8 @@ export default function Upload() {
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
-              className="block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-sky-500 focus:outline-none"
+              disabled={submitting}
+              className="input-field"
             >
               <option value="gemini" disabled={!providers.gemini}>
                 Gemini {providers.gemini ? "" : "(not configured)"}
@@ -180,57 +180,74 @@ export default function Upload() {
           </Field>
         </div>
 
-        {error && (
-          <div className="rounded-lg border border-rose-700/60 bg-rose-900/30 px-4 py-3 text-sm text-rose-200">
-            {error}
-          </div>
-        )}
+        {error && <div className="alert-error">{error}</div>}
 
         <button
           type="submit"
-          disabled={submitting || !file || noProviders || !canUpload}
-          className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-medium text-white shadow transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          disabled={submitting || !file || noProviders}
+          className="btn-primary"
         >
-          {submitting ? "Uploading..." : "Start extraction"}
+          {submitting ? "Uploading & starting…" : "Start extraction"}
         </button>
       </form>
 
       {recentJobs.length > 0 && (
-        <section className="mt-10 border-t border-slate-800 pt-8">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+        <section className="mt-10 border-t border-gray-200 pt-8">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Your workspace
             {user?.email ? (
-              <span className="ml-2 font-normal normal-case text-slate-500">({user.email})</span>
+              <span className="ml-2 font-normal normal-case text-gray-400">({user.email})</span>
             ) : null}
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Only your uploads appear here. Other accounts cannot see these jobs.
+          <p className="mt-1 text-xs text-gray-400">
+            Recent extractions — only visible to your account.
           </p>
           <ul className="mt-4 space-y-3">
             {recentJobs.map((job) => (
               <li
                 key={job.id}
-                className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-4"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-4 transition hover:border-gray-300 hover:bg-white"
               >
-                <p className="text-sm font-medium text-slate-100">
-                  {job.subject} · <span className="uppercase text-slate-400">{job.status}</span>
-                  {job.status === "done" ? ` · ${job.question_count} questions` : ""}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-gray-900">{job.subject}</p>
+                  <JobStatusPill status={job.status} />
+                </div>
+                {job.status === "done" && (
+                  <p className="mt-1 text-xs text-gray-500">{job.question_count} questions</p>
+                )}
+                {job.status === "processing" && job.progress_total > 0 && (
+                  <div className="mt-3">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className="h-full rounded-full bg-zinc-800 transition-all"
+                        style={{
+                          width: `${Math.round(
+                            ((job.progress_current || 0) / job.progress_total) * 100,
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {job.progress_current} / {job.progress_total}
+                      {job.progress_label ? ` · ${job.progress_label}` : ""}
+                    </p>
+                  </div>
+                )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => navigate(`/job/${job.id}`)}
-                    className="rounded-md border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-sky-600"
+                    className="btn-secondary py-1.5 text-xs"
                   >
-                    Job status
+                    {job.status === "done" || job.status === "failed" ? "View job" : "View progress"}
                   </button>
                   {job.status === "done" && job.question_count > 0 && (
                     <button
                       type="button"
                       onClick={() => navigate(`/review/${job.id}`)}
-                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500"
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                     >
-                      View {job.question_count} questions
+                      Review questions
                     </button>
                   )}
                 </div>
@@ -239,37 +256,59 @@ export default function Upload() {
           </ul>
         </section>
       )}
-
-      {recentJobs.length === 0 && user && !canUpload && (
-        <p className="mt-8 text-sm text-slate-500">No extractions yet for this account.</p>
-      )}
     </div>
+  );
+}
+
+function JobStatusPill({ status }) {
+  const styles = {
+    pending: "bg-gray-200 text-gray-700",
+    queued: "bg-gray-200 text-gray-700",
+    processing: "bg-amber-100 text-amber-900",
+    done: "bg-emerald-100 text-emerald-800",
+    failed: "bg-red-100 text-red-800",
+  };
+  return (
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${styles[status] || styles.pending}`}
+    >
+      {status}
+    </span>
   );
 }
 
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
+      <span className="label-field">{label}</span>
       <span className="mt-1 block">{children}</span>
     </label>
   );
 }
 
-function DropZone({ file, dragOver, inputRef, onDragOver, onDragLeave, onDrop, onPick, onChange }) {
+function DropZone({
+  file,
+  dragOver,
+  disabled,
+  inputRef,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onPick,
+  onChange,
+}) {
   return (
     <div
-      onDragOver={onDragOver}
+      onDragOver={disabled ? undefined : onDragOver}
       onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDrop={disabled ? undefined : onDrop}
       onClick={onPick}
       className={[
-        "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition",
+        "flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
         dragOver
-          ? "border-sky-400 bg-sky-500/10 text-sky-100"
-          : "border-slate-700 bg-slate-900/50 text-slate-300 hover:border-slate-500",
+          ? "border-zinc-900 bg-zinc-50 text-zinc-900"
+          : "border-gray-300 bg-gray-50 text-gray-600 hover:border-gray-400 hover:bg-white",
       ].join(" ")}
     >
       <input
@@ -279,19 +318,20 @@ function DropZone({ file, dragOver, inputRef, onDragOver, onDragLeave, onDrop, o
         type="file"
         accept="application/pdf"
         className="hidden"
+        disabled={disabled}
         onChange={onChange}
       />
       {file ? (
         <>
-          <p className="text-sm font-medium text-slate-100">{file.name}</p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="text-sm font-semibold text-gray-900">{file.name}</p>
+          <p className="mt-1 text-xs text-gray-500">
             {(file.size / (1024 * 1024)).toFixed(2)} MB · click or drop to replace
           </p>
         </>
       ) : (
         <>
-          <p className="text-sm font-medium">Drag and drop a PDF here</p>
-          <p className="mt-1 text-xs text-slate-400">or click to browse · 50 MB max</p>
+          <p className="text-sm font-semibold text-gray-800">Drag and drop a PDF here</p>
+          <p className="mt-1 text-xs text-gray-500">or click to browse · 50 MB max</p>
         </>
       )}
     </div>
