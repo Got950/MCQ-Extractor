@@ -1,0 +1,115 @@
+# Backend API only. Deploy the React frontend separately on Netlify.
+services:
+  - type: web
+    name: mcq-extractor-api
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: |
+      pip install -r requirements.txt
+      python -m scripts.init_database
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: mcq_extractor
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: SUPERADMIN_MAX_UPLOADS
+        value: "100"
+      - key: REDIS_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEYS
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      - key: GEMINI_MIN_INTERVAL_MS
+        value: "2500"
+      - key: GEMINI_MAX_RETRIES
+        value: "5"
+      - key: OLLAMA_HOST
+        sync: false
+      - key: OLLAMA_MODEL
+        value: qwen2.5vl
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: UPLOAD_TTL_HOURS
+        value: "168"
+      - key: JWT_EXPIRE_MINUTES
+        value: "1440"
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+
+  - type: worker
+    name: mcq-extractor-worker
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker.py
+    envVars:
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: APP_SECRET
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: MONGODB_URI
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: MONGODB_DB_NAME
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: REDIS_URL
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: GEMINI_API_KEY
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: GEMINI_API_KEYS
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: GEMINI_MODEL
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: GEMINI_MIN_INTERVAL_MS
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: GEMINI_MAX_RETRIES
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: S3_BUCKET
+      - fromService:
+          name: mcq-extractor-api
+          type: web
+          envVarKey: S3_REGION

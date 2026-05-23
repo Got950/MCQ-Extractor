@@ -1,0 +1,14 @@
+uploads/
+.env
+*.db
+backend/data/*.db
+!backend/data/README.md
+__pycache__/
+*.pyc
+.venv/
+.venv-mac/
+venv/
+backend/.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+.DS_Store
