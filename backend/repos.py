@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -20,7 +30,7 @@ def _user_from_doc(doc: dict[str, Any]) -> User:
         password_hash=doc["password_hash"],
         is_active=bool(doc.get("is_active", True)),
         is_superadmin=bool(doc.get("is_superadmin", False)),
-        created_at=doc["created_at"],
+        created_at=ensure_utc(doc["created_at"]),
     )
 
 
@@ -34,8 +44,8 @@ def _job_from_doc(doc: dict[str, Any]) -> Job:
         status=doc["status"],
         pdf_key=doc["pdf_key"],
         error_message=doc.get("error_message"),
-        created_at=doc["created_at"],
-        completed_at=doc.get("completed_at"),
+        created_at=ensure_utc(doc["created_at"]),
+        completed_at=ensure_utc(doc["completed_at"]) if doc.get("completed_at") else None,
         progress_current=int(doc.get("progress_current") or 0),
         progress_total=int(doc.get("progress_total") or 0),
         progress_label=str(doc.get("progress_label") or ""),
@@ -78,7 +88,7 @@ def create_user(
     password_hash: str,
     is_superadmin: bool = False,
 ) -> User:
-    now = datetime.utcnow()
+    now = utc_now()
     doc = {
         "email": email,
         "password_hash": password_hash,
@@ -110,7 +120,7 @@ def create_job(
     pdf_key: str,
     status: str = "queued",
 ) -> Job:
-    now = datetime.utcnow()
+    now = utc_now()
     doc = {
         "_id": job_id,
         "owner_id": owner_id,

@@ -48,10 +48,7 @@ function statusMessage(status, { progressLabel, progressCurrent, progressTotal, 
           progressLabel ? ` — ${progressLabel}` : ""
         }…`;
       }
-      return (
-        progressLabel ||
-        "AI is reading your PDF and extracting MCQs. Large files can take 5–15 minutes."
-      );
+      return progressLabel || "Extracting questions from your PDF…";
     case "done":
       return "Extraction finished. You can review and edit questions.";
     case "failed":
@@ -68,7 +65,6 @@ export default function ExtractionStatusBar({
   progressTotal = 0,
   progressLabel,
   questionCount,
-  elapsedMinutes,
   className = "",
 }) {
   const active = stepIndex(status);
@@ -98,11 +94,6 @@ export default function ExtractionStatusBar({
         {!failed && status !== "done" && !indeterminate && percent != null && (
           <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
             {percent}%
-          </span>
-        )}
-        {!failed && status !== "done" && elapsedMinutes != null && elapsedMinutes >= 1 && (
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-            {elapsedMinutes} min elapsed
           </span>
         )}
       </div>

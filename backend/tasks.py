@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from repos import utc_now
 
 from config import settings
 from database import get_database
@@ -51,7 +51,7 @@ def run_extraction(job_id: str) -> None:
                 job_id,
                 status="failed",
                 error_message=_safe_error(exc),
-                completed_at=datetime.utcnow(),
+                completed_at=utc_now(),
             )
             clear_progress(job_id)
             return
@@ -66,7 +66,7 @@ def run_extraction(job_id: str) -> None:
                     "The model returned no questions. The PDF may be image-only, "
                     "scanned at low quality, or not contain recognisable MCQs."
                 ),
-                completed_at=datetime.utcnow(),
+                completed_at=utc_now(),
             )
             clear_progress(job_id)
             return
@@ -90,7 +90,7 @@ def run_extraction(job_id: str) -> None:
             db,
             job_id,
             status="done",
-            completed_at=datetime.utcnow(),
+            completed_at=utc_now(),
             error_message=None,
         )
         clear_progress(job_id)

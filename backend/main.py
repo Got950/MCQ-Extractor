@@ -30,6 +30,7 @@ from auth import create_access_token, get_current_user, hash_password, verify_pa
 from config import settings
 from database import ensure_database, get_db, ping_db
 from job_progress import get_progress
+from job_stale import reconcile_stale_job
 from job_queue import enqueue_extraction, ping_queue
 from models import Job, User
 from repos import (
@@ -74,7 +75,7 @@ from storage import get_storage
 logger = logging.getLogger("mcq-extractor")
 logging.basicConfig(level=logging.INFO)
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[])
@@ -184,6 +185,7 @@ def _get_owned_job_or_404(job_id: str, db: Database, user: User) -> Job:
 
 
 def _job_out(db: Database, job: Job) -> JobOut:
+    job = reconcile_stale_job(db, job)
     count = (
         count_questions_for_job(db, job.id) if job.status == "done" else 0
     )
