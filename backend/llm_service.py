@@ -54,6 +54,7 @@ class _GeminiQuestion(TypedDict):
     options: _GeminiOptions
     correct_answer: str
     solution: str
+    subject: str
 
 
 class _GeminiOutput(TypedDict):
@@ -76,7 +77,8 @@ Strict output rules:
       "question_text": "string",
       "options": {{"A": "string", "B": "string", "C": "string", "D": "string"}},
       "correct_answer": "A" | "B" | "C" | "D" | null,
-      "solution": "string"
+      "solution": "string",
+      "subject": "Physics" | "Chemistry" | "Mathematics" | "General"
     }}
   ]
 }}
@@ -91,7 +93,21 @@ A single backslash inside a JSON string is always a syntax error.
 5. If a field is not present in the PDF, use null for correct_answer or "" for solution.
 6. Do not merge or split questions. Each MCQ in the PDF = one entry.
 7. Keep option text faithful to the source (preserve units, signs, math).
+8. Classify each question under 'subject' based on its actual academic content —
+   Physics, Chemistry, Mathematics, or General. Ignore the document's overall subject
+   label. Use 'General' only if the question genuinely fits no other category
+   (e.g. logical reasoning, mixed-topic matching).
 """
+
+VALID_QUESTION_SUBJECTS = frozenset({"Physics", "Chemistry", "Mathematics", "General"})
+
+# Stashed per job_id so insert_questions can read LLM subjects without changing tasks.py.
+_extractions_by_job: dict[str, list[dict[str, Any]]] = {}
+
+
+def take_extraction_questions(job_id: str) -> list[dict[str, Any]] | None:
+    """Pop and return the last extraction result for ``job_id`` (insert path)."""
+    return _extractions_by_job.pop(job_id, None)
 
 
 def extract_mcqs(
@@ -103,10 +119,14 @@ def extract_mcqs(
     """Dispatch to the configured LLM provider and return a list of question dicts."""
     provider = (provider or "").lower().strip()
     if provider == "gemini":
-        return _call_gemini(pdf_path, subject, job_id=job_id)
-    if provider == "ollama":
-        return _call_ollama(pdf_path, subject)
-    raise ValueError(f"Unknown provider: {provider!r}")
+        result = _call_gemini(pdf_path, subject, job_id=job_id)
+    elif provider == "ollama":
+        result = _call_ollama(pdf_path, subject)
+    else:
+        raise ValueError(f"Unknown provider: {provider!r}")
+    if job_id:
+        _extractions_by_job[job_id] = result
+    return result
 
 
 def _gemini_keys() -> list[str]:
@@ -1154,6 +1174,12 @@ def _parse_questions(text: str) -> list[dict[str, Any]]:
                 correct = None
         else:
             correct = None
+        raw_subject = str(raw.get("subject", "") or "").strip()
+        subject_val = (
+            raw_subject
+            if raw_subject in VALID_QUESTION_SUBJECTS
+            else ""
+        )
         normalised.append(
             {
                 "question_text": str(raw.get("question_text", "") or ""),
@@ -1165,6 +1191,7 @@ def _parse_questions(text: str) -> list[dict[str, Any]]:
                 },
                 "correct_answer": correct,
                 "solution": str(raw.get("solution", "") or ""),
+                "subject": subject_val,
             }
         )
     return normalised

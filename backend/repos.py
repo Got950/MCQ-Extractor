@@ -20,7 +20,11 @@ from bson.errors import InvalidId
 from pymongo.database import Database
 from pymongo.errors import DuplicateKeyError
 
+from llm_service import take_extraction_questions
+
 from models import Job, Question, User
+
+VALID_QUESTION_SUBJECTS = frozenset({"Physics", "Chemistry", "Mathematics", "General"})
 
 
 def _user_from_doc(doc: dict[str, Any]) -> User:
@@ -63,7 +67,31 @@ def _question_from_doc(doc: dict[str, Any]) -> Question:
         option_d=doc.get("option_d", ""),
         correct_answer=doc.get("correct_answer"),
         solution=doc.get("solution", ""),
+        subject=_question_subject_from_doc(doc),
     )
+
+
+def _question_subject_from_doc(doc: dict[str, Any], *, job_subject: str = "General") -> str:
+    subj = (doc.get("subject") or "").strip()
+    if subj in VALID_QUESTION_SUBJECTS:
+        return subj
+    js = (job_subject or "").strip()
+    if js in VALID_QUESTION_SUBJECTS:
+        return js
+    return "General"
+
+
+def _resolve_question_subject(
+    parsed_subject: str,
+    job_subject: str,
+) -> str:
+    q_subject = (parsed_subject or "").strip()
+    if q_subject in VALID_QUESTION_SUBJECTS:
+        return q_subject
+    js = (job_subject or "").strip()
+    if js in VALID_QUESTION_SUBJECTS:
+        return js
+    return "General"
 
 
 # --- Users -------------------------------------------------------------------
@@ -170,7 +198,20 @@ def delete_questions_for_job(db: Database, job_id: str) -> None:
 def insert_questions(db: Database, job_id: str, rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
-    docs = [{"job_id": job_id, **row} for row in rows]
+    job = find_job_by_id(db, job_id)
+    job_subject = job.subject if job else "General"
+    llm_questions = take_extraction_questions(job_id) or []
+    docs: list[dict[str, Any]] = []
+    for i, row in enumerate(rows):
+        parsed_q = llm_questions[i] if i < len(llm_questions) else {}
+        parsed_subject = str(
+            row.get("subject") or parsed_q.get("subject", "") or ""
+        )
+        q_subject = _resolve_question_subject(parsed_subject, job_subject)
+        doc = {k: v for k, v in row.items() if k != "subject"}
+        doc["job_id"] = job_id
+        doc["subject"] = q_subject
+        docs.append(doc)
     result = db.questions.insert_many(docs)
     return len(result.inserted_ids)
 
@@ -194,6 +235,13 @@ def update_question(db: Database, question_id: str, **fields: Any) -> Question |
         oid = ObjectId(question_id)
     except (InvalidId, TypeError):
         return None
+    if "subject" in fields:
+        subj = (fields.get("subject") or "").strip()
+        if subj not in VALID_QUESTION_SUBJECTS:
+            raise ValueError(
+                "subject must be Physics, Chemistry, Mathematics, or General"
+            )
+        fields = {**fields, "subject": subj}
     if fields:
         db.questions.update_one({"_id": oid}, {"$set": fields})
     doc = db.questions.find_one({"_id": oid})

@@ -362,8 +362,13 @@ def update_question_route(
         fields["correct_answer"] = payload.correct_answer
     if payload.solution is not None:
         fields["solution"] = clean_rich(payload.solution)
+    if payload.subject is not None:
+        fields["subject"] = payload.subject
 
-    updated = update_question(db, question_id, **fields)
+    try:
+        updated = update_question(db, question_id, **fields)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not updated:
         raise HTTPException(status_code=404, detail="Question not found")
     return QuestionOut.from_question(updated)
