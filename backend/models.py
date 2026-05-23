@@ -28,6 +28,9 @@ class Job:
     error_message: str | None
     created_at: datetime
     completed_at: datetime | None
+    progress_current: int = 0
+    progress_total: int = 0
+    progress_label: str = ""
 
 
 @dataclass

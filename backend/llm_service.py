@@ -32,7 +32,7 @@ DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 65536
 DEFAULT_GEMINI_TIMEOUT_S = 75
 # 0 = no job-level time limit (extraction runs until Gemini finishes or fails).
 DEFAULT_GEMINI_JOB_BUDGET_S = 0
-DEFAULT_GEMINI_MAX_PAGES_SINGLE_SHOT = 30
+DEFAULT_GEMINI_MAX_PAGES_SINGLE_SHOT = 4
 DEFAULT_GEMINI_PARALLEL_WORKERS = 6
 _DEFAULT_MAX_RETRIES = 2
 _DEFAULT_INITIAL_BACKOFF_S = 1.0
@@ -725,14 +725,24 @@ def _call_gemini(
         _check_job_deadline(deadline)
 
         if job_id:
-            set_progress(job_id, current=0, total=1, label="Starting")
+            set_progress(
+                job_id,
+                current=0,
+                total=max(total_pages, 1),
+                label=f"Preparing {total_pages} page(s)",
+            )
 
         master: list[dict[str, Any]] = []
 
         # Fast path: entire PDF in one Gemini call when the PDF is small enough.
         if total_pages <= _gemini_max_pages_single_shot():
             if job_id:
-                set_progress(job_id, current=1, total=1, label="Full document")
+                set_progress(
+                    job_id,
+                    current=0,
+                    total=1,
+                    label="Sending PDF to Gemini (may take a few minutes)…",
+                )
             try:
                 master = _gemini_extract_full_document(
                     doc,

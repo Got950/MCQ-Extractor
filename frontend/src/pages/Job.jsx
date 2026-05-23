@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import ExtractionStatusBar from "../components/ExtractionStatusBar.jsx";
 import { getJob, retryJob } from "../api/client.js";
 
-const POLL_ACTIVE_MS = 2000;
+const POLL_ACTIVE_MS = 1500;
 const POLL_IDLE_MS = 5000;
 
 export default function Job() {
@@ -13,6 +13,13 @@ export default function Job() {
   const [error, setError] = useState(null);
   const [retrying, setRetrying] = useState(false);
   const [pollKey, setPollKey] = useState(0);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!job || job.status === "done" || job.status === "failed") return;
+    const t = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(t);
+  }, [job?.status, job?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +61,10 @@ export default function Job() {
 
   const inProgress = job && job.status !== "done" && job.status !== "failed";
 
+  const elapsedMinutes = job?.created_at
+    ? Math.floor((now - new Date(job.created_at).getTime()) / 60000)
+    : 0;
+
   return (
     <div className="card">
       <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Extraction job</h1>
@@ -83,6 +94,7 @@ export default function Job() {
               progressCurrent={job.progress_current ?? 0}
               progressTotal={job.progress_total ?? 0}
               progressLabel={job.progress_label}
+              elapsedMinutes={inProgress ? elapsedMinutes : undefined}
               questionCount={job.status === "done" ? job.question_count : undefined}
             />
           </div>
@@ -95,8 +107,15 @@ export default function Job() {
 
           {inProgress && (
             <p className="mt-4 text-sm text-gray-500">
-              Please keep this page open while extraction runs. You will be able to review
-              questions when processing completes.
+              Please keep this page open. Chemistry or large exam PDFs often take{" "}
+              <strong className="font-medium text-gray-700">5–15 minutes</strong> on the first
+              run. Progress updates as each page is processed.
+              {elapsedMinutes >= 8 && (
+                <span className="mt-2 block text-amber-800">
+                  Still running after {elapsedMinutes} minutes — if it exceeds 20 minutes,
+                  use Retry extraction or try a shorter PDF.
+                </span>
+              )}
             </p>
           )}
 

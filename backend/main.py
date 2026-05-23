@@ -74,7 +74,7 @@ from storage import get_storage
 logger = logging.getLogger("mcq-extractor")
 logging.basicConfig(level=logging.INFO)
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[])

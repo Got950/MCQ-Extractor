@@ -8,7 +8,7 @@ from datetime import datetime
 from config import settings
 from database import get_database
 from llm_service import extract_mcqs
-from job_progress import clear_progress
+from job_progress import clear_progress, set_progress
 from repos import (
     delete_questions_for_job,
     find_job_by_id,
@@ -37,6 +37,7 @@ def run_extraction(job_id: str) -> None:
             return
 
         update_job(db, job_id, status="processing")
+        set_progress(job_id, current=0, total=1, label="Starting extraction")
 
         try:
             with storage.open_local(job.pdf_key) as local_path:

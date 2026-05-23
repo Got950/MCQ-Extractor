@@ -36,6 +36,9 @@ def _job_from_doc(doc: dict[str, Any]) -> Job:
         error_message=doc.get("error_message"),
         created_at=doc["created_at"],
         completed_at=doc.get("completed_at"),
+        progress_current=int(doc.get("progress_current") or 0),
+        progress_total=int(doc.get("progress_total") or 0),
+        progress_label=str(doc.get("progress_label") or ""),
     )
 
 

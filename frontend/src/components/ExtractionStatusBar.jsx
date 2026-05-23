@@ -28,11 +28,11 @@ function progressPercent(status, current, total) {
   if (status === "failed") return 0;
   if (status === "uploading") return 12;
   if (status === "queued" || status === "pending") return 28;
-  if (status === "processing" && total > 0 && current >= 0) {
-    return 35 + Math.round((current / total) * 55);
+  if (status === "processing" && total > 0) {
+    const pct = Math.round((Math.max(current, 0) / total) * 100);
+    return Math.min(99, Math.max(35, pct));
   }
-  if (status === "processing") return 50;
-  return 8;
+  return null;
 }
 
 function statusMessage(status, { progressLabel, progressCurrent, progressTotal, fileName }) {
@@ -48,7 +48,10 @@ function statusMessage(status, { progressLabel, progressCurrent, progressTotal, 
           progressLabel ? ` — ${progressLabel}` : ""
         }…`;
       }
-      return "AI is reading your PDF and extracting MCQs…";
+      return (
+        progressLabel ||
+        "AI is reading your PDF and extracting MCQs. Large files can take 5–15 minutes."
+      );
     case "done":
       return "Extraction finished. You can review and edit questions.";
     case "failed":
@@ -65,11 +68,13 @@ export default function ExtractionStatusBar({
   progressTotal = 0,
   progressLabel,
   questionCount,
+  elapsedMinutes,
   className = "",
 }) {
   const active = stepIndex(status);
   const percent = progressPercent(status, progressCurrent, progressTotal);
-  const indeterminate = status === "uploading" || (status === "processing" && !progressTotal);
+  const indeterminate =
+    status === "uploading" || (status === "processing" && (!progressTotal || percent === null));
   const failed = status === "failed";
 
   return (
@@ -90,9 +95,14 @@ export default function ExtractionStatusBar({
             Failed
           </span>
         )}
-        {!failed && status !== "done" && (
+        {!failed && status !== "done" && !indeterminate && percent != null && (
           <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
             {percent}%
+          </span>
+        )}
+        {!failed && status !== "done" && elapsedMinutes != null && elapsedMinutes >= 1 && (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+            {elapsedMinutes} min elapsed
           </span>
         )}
       </div>
@@ -114,7 +124,7 @@ export default function ExtractionStatusBar({
             className={`h-full rounded-full transition-all duration-500 ease-out ${
               failed ? "bg-red-500" : status === "done" ? "bg-emerald-600" : "bg-zinc-800"
             }`}
-            style={{ width: `${failed ? 100 : percent}%` }}
+            style={{ width: `${failed ? 100 : percent ?? 0}%` }}
           />
         )}
       </div>
