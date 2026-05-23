@@ -85,13 +85,12 @@ def _resolve_question_subject(
     parsed_subject: str,
     job_subject: str,
 ) -> str:
-    """Prefer the upload/job subject so section uploads tag every MCQ consistently."""
-    js = (job_subject or "").strip()
-    if js in VALID_QUESTION_SUBJECTS:
-        return js
     q_subject = (parsed_subject or "").strip()
     if q_subject in VALID_QUESTION_SUBJECTS:
         return q_subject
+    js = (job_subject or "").strip()
+    if js in VALID_QUESTION_SUBJECTS:
+        return js
     return "General"
 
 

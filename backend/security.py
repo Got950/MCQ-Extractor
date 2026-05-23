@@ -86,12 +86,12 @@ async def validated_chunks(
         yield chunk
 
 
-from subject_sections import CANONICAL_SUBJECTS
+_SAFE_SUBJECTS = {"Physics", "Chemistry", "Mathematics"}
 
 
 def validate_subject(value: str) -> str:
     value = (value or "").strip()
-    if value not in CANONICAL_SUBJECTS:
+    if value not in _SAFE_SUBJECTS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid subject"
         )

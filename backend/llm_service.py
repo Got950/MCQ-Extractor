@@ -24,8 +24,6 @@ from typing import Any
 
 from typing_extensions import TypedDict
 
-from subject_sections import page_indices_for_subject
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
@@ -68,13 +66,7 @@ class GeminiMaxTokensError(RuntimeError):
 
 SHARED_PROMPT_TEMPLATE = """You are an expert academic content parser.
 
-Extract ONLY multiple-choice questions (MCQ) that belong to the {subject} section(s)
-of this exam paper.
-
-The PDF may be a combined paper with several subjects. Find the sections that belong
-to {subject} using whatever headings the publisher uses (subject name plus Section,
-Part, or similar). Extract ONLY those sections — not other subjects on the same paper.
-On a page shared by two subjects, extract only MCQs under the {subject} heading.
+Extract EVERY multiple-choice question (MCQ) from the attached {subject} PDF.
 
 Strict output rules:
 1. Return ONLY raw JSON. No markdown fences. No preamble. No trailing prose.
@@ -101,7 +93,10 @@ A single backslash inside a JSON string is always a syntax error.
 5. If a field is not present in the PDF, use null for correct_answer or "" for solution.
 6. Do not merge or split questions. Each MCQ in the PDF = one entry.
 7. Keep option text faithful to the source (preserve units, signs, math).
-8. Set "subject" to "{subject}" for every question you return.
+8. Classify each question under 'subject' based on its actual academic content —
+   Physics, Chemistry, Mathematics, or General. Ignore the document's overall subject
+   label. Use 'General' only if the question genuinely fits no other category
+   (e.g. logical reasoning, mixed-topic matching).
 """
 
 VALID_QUESTION_SUBJECTS = frozenset({"Physics", "Chemistry", "Mathematics", "General"})
@@ -662,25 +657,19 @@ def _gemini_parallel_page_extract(
     model_name: str,
     job_id: str | None,
     deadline: float | None,
-    page_indices: list[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Fallback: one page per worker in parallel."""
     from job_progress import set_progress
 
-    pages_to_run = page_indices if page_indices is not None else list(range(total_pages))
-    if not pages_to_run:
-        return []
-
-    workers = min(_gemini_parallel_workers(), len(pages_to_run))
+    workers = min(_gemini_parallel_workers(), total_pages)
     _log_event(
         logging.INFO,
         "gemini_parallel_started",
-        pages=len(pages_to_run),
+        pages=total_pages,
         workers=workers,
-        subject=subject,
     )
 
-    page_b64 = {i: _page_pdf_b64(doc, i, i) for i in pages_to_run}
+    page_b64 = [_page_pdf_b64(doc, i, i) for i in range(total_pages)]
 
     def _run_page(page_i: int) -> list[dict[str, Any]]:
         _check_job_deadline(deadline)
@@ -711,7 +700,7 @@ def _gemini_parallel_page_extract(
     any_ok = False
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_run_page, page_i): page_i for page_i in pages_to_run}
+        futures = {pool.submit(_run_page, page_i): page_i for page_i in range(total_pages)}
         for fut in as_completed(futures):
             page_i = futures[fut]
             try:
@@ -732,8 +721,8 @@ def _gemini_parallel_page_extract(
                 set_progress(
                     job_id,
                     current=done_count,
-                    total=len(pages_to_run),
-                    label=f"Page {done_count}/{len(pages_to_run)} ({subject})",
+                    total=total_pages,
+                    label=f"Page {done_count}/{total_pages}",
                 )
 
     if not any_ok and last_exc is not None:
@@ -755,88 +744,18 @@ def _call_gemini(
         total_pages = len(doc)
         _check_job_deadline(deadline)
 
-        section_pages = page_indices_for_subject(doc, subject)
-        if section_pages is not None and not section_pages:
-            logger.warning(
-                "No %s section headers found in PDF (%d pages)", subject, total_pages
-            )
-            return []
-
-        pages_to_extract = (
-            section_pages if section_pages is not None else list(range(total_pages))
-        )
-        extract_page_count = len(pages_to_extract)
-
-        if section_pages is not None:
-            _log_event(
-                logging.INFO,
-                "gemini_section_filter",
-                subject=subject,
-                pages_1based=[p + 1 for p in section_pages],
-                total_pages=total_pages,
-            )
-
         if job_id:
             set_progress(
                 job_id,
                 current=0,
-                total=max(extract_page_count, 1),
-                label=(
-                    f"Preparing {extract_page_count} {subject} page(s)"
-                    if section_pages is not None
-                    else f"Preparing {total_pages} page(s)"
-                ),
+                total=max(total_pages, 1),
+                label=f"Preparing {total_pages} page(s)",
             )
 
         master: list[dict[str, Any]] = []
 
-        def _extract_subset() -> list[dict[str, Any]]:
-            if extract_page_count <= _gemini_max_pages_single_shot():
-                subset = fitz.open()
-                try:
-                    for p in pages_to_extract:
-                        subset.insert_pdf(doc, from_page=p, to_page=p)
-                    if job_id:
-                        set_progress(
-                            job_id,
-                            current=0,
-                            total=1,
-                            label=f"Sending {subject} section to Gemini…",
-                        )
-                    try:
-                        return _gemini_extract_full_document(
-                            subset,
-                            total_pages=extract_page_count,
-                            subject=subject,
-                            model_name=model_name,
-                        )
-                    except (GeminiMaxTokensError, RuntimeError) as exc:
-                        if isinstance(exc, RuntimeError) and not _is_retryable_gemini_error(
-                            exc
-                        ):
-                            raise
-                        return _gemini_parallel_page_extract(
-                            doc,
-                            total_pages=total_pages,
-                            subject=subject,
-                            model_name=model_name,
-                            job_id=job_id,
-                            deadline=deadline,
-                            page_indices=pages_to_extract,
-                        )
-                finally:
-                    subset.close()
-            return _gemini_parallel_page_extract(
-                doc,
-                total_pages=total_pages,
-                subject=subject,
-                model_name=model_name,
-                job_id=job_id,
-                deadline=deadline,
-                page_indices=pages_to_extract,
-            )
-
-        if section_pages is None and total_pages <= _gemini_max_pages_single_shot():
+        # Fast path: entire PDF in one Gemini call when the PDF is small enough.
+        if total_pages <= _gemini_max_pages_single_shot():
             if job_id:
                 set_progress(
                     job_id,
@@ -875,20 +794,19 @@ def _call_gemini(
                     deadline=deadline,
                 )
         else:
-            if section_pages is not None:
-                _log_event(
-                    logging.INFO,
-                    "gemini_section_extract",
-                    subject=subject,
-                    page_count=extract_page_count,
-                )
-            else:
-                _log_event(
-                    logging.INFO,
-                    "gemini_large_pdf_parallel",
-                    pages=total_pages,
-                )
-            master = _extract_subset()
+            _log_event(
+                logging.INFO,
+                "gemini_large_pdf_parallel",
+                pages=total_pages,
+            )
+            master = _gemini_parallel_page_extract(
+                doc,
+                total_pages=total_pages,
+                subject=subject,
+                model_name=model_name,
+                job_id=job_id,
+                deadline=deadline,
+            )
 
     merged = _dedupe_questions(master)
     _log_event(
@@ -958,15 +876,8 @@ def _call_ollama(pdf_path: str, subject: str) -> list[dict[str, Any]]:
 
     images: list[str] = []
     with fitz.open(pdf_path) as doc:
-        section_pages = page_indices_for_subject(doc, subject)
-        if section_pages is not None and not section_pages:
-            logger.warning("No %s section headers found in PDF", subject)
-            return []
-        page_range = (
-            section_pages if section_pages is not None else list(range(len(doc)))
-        )
-        for page_i in page_range:
-            pix = doc[page_i].get_pixmap(dpi=150)
+        for page in doc:
+            pix = page.get_pixmap(dpi=150)
             png_bytes = pix.tobytes("png")
             images.append(base64.b64encode(png_bytes).decode("ascii"))
 
